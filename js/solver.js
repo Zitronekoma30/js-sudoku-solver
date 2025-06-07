@@ -26,6 +26,8 @@ async function loadSudoku() {
         console.error('Failed to load puzzle:', error);
         loadFallbackPuzzle();
     }
+
+    updateOpts();
 }
 
 function loadFallbackPuzzle() {
@@ -125,22 +127,25 @@ function getOptions(x, y) {
     // check vert
     for (let i = 0; i < 9; i++) {
         let curr = puzzle[x][i];
+        if (Array.isArray(curr) || curr === 0) continue;
         found.add(curr);
     }
 
     //check horiz
     for (let i = 0; i < 9; i++) {
         let curr = puzzle[i][y];
+        if (Array.isArray(curr) || curr === 0) continue;
         found.add(curr);
     }
 
     //check square
-    square_x = Math.floor(x / 3);
-    square_y = Math.floor(y / 3);
+    let square_x = Math.floor(x / 3);
+    let square_y = Math.floor(y / 3);
 
     for (let i = square_x * 3; i < square_x * 3 + 3; i++) {
         for (let j = square_y * 3; j < square_y * 3 + 3; j++) {
             let curr = puzzle[i][j];
+            if (Array.isArray(curr) || curr === 0) continue;
             found.add(curr);
         }
     }
@@ -149,13 +154,83 @@ function getOptions(x, y) {
     return opts;
 }
 
-function nextStep() {
+function findOnlyOptions(x, y) {
+    if (!Array.isArray(puzzle[x][y])) return null;
+
+    let opts = puzzle[x][y];
+
+    let rowOptions = new Set();
+    for (let i = 0; i < 9; i++) {
+        if (i !== y && Array.isArray(puzzle[x][i])) {
+            puzzle[x][i].forEach(opt => rowOptions.add(opt));
+        }
+    }
+
+    let colOptions = new Set();
+    for (let i = 0; i < 9; i++) {
+        if (i !== x && Array.isArray(puzzle[i][y])) {
+            puzzle[i][y].forEach(opt => colOptions.add(opt));
+        }
+    }
+
+    let squareOptions = new Set();
+    let square_x = Math.floor(x / 3);
+    let square_y = Math.floor(y / 3);
+    for (let i = square_x * 3; i < square_x * 3 + 3; i++) {
+        for (let j = square_y * 3; j < square_y * 3 + 3; j++) {
+            if ((i !== x || j !== y) && Array.isArray(puzzle[i][j])) {
+                puzzle[i][j].forEach(opt => squareOptions.add(opt));
+            }
+        }
+    }
+
+    for (let option of opts) {
+        if (!rowOptions.has(option) || !colOptions.has(option) || !squareOptions.has(option)) {
+            return option;
+        }
+    }
+
+    return null;
+}
+
+function updateOpts() {
+    // find all new options
     for (let x = 0; x < puzzle.length; x++) {
         for (let y = 0; y < puzzle[x].length; y++) {
-            if (puzzle[x][y] == 0) {
-                opts = getOptions(x, y);
+            if (puzzle[x][y] == 0 || Array.isArray(puzzle[x][y])) {
+                let opts = getOptions(x, y);
                 puzzle[x][y] = opts;
                 fillCandidates(x, y, opts);
+            }
+        }
+    }
+}
+
+function nextStep() {
+    // fill singles
+    for (let x = 0; x < puzzle.length; x++) {
+        for (let y = 0; y < puzzle[x].length; y++) {
+            if (!Array.isArray(puzzle[x][y])) {
+                continue;
+            }
+            if (puzzle[x][y].length == 1) {
+                puzzle[x][y] = puzzle[x][y][0];
+                solveCell(x, y, puzzle[x][y]);
+                updateOpts();
+            }
+        }
+    }
+
+    // fill only options
+    for (let x = 0; x < puzzle.length; x++) {
+        for (let y = 0; y < puzzle[x].length; y++) {
+            if (Array.isArray(puzzle[x][y])) {
+                only = findOnlyOptions(x, y);
+                if (only !== null) {
+                    puzzle[x][y] = only;
+                    solveCell(x, y, only);
+                    updateOpts();
+                }
             }
         }
     }
