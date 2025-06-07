@@ -1,14 +1,59 @@
 const cellElements = [];
+const nums = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+let puzzle = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     createGrid();
     setupEventListeners();
+    loadSudoku();
 });
+
+async function loadSudoku() {
+    try {
+        const response = await fetch('https://sudoku-api.vercel.app/api/dosuku?query={newboard(limit:1){grids{value,solution,difficulty}}}');
+        const data = await response.json();
+        puzzle = data.newboard.grids[0].value;
+
+        for (let row = 0; row < 9; row++) {
+            for (let col = 0; col < 9; col++) {
+                const value = puzzle[row][col];
+                if (value !== 0) {
+                    solveCell(row, col, value);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load puzzle:', error);
+        loadFallbackPuzzle();
+    }
+}
+
+function loadFallbackPuzzle() {
+    const fallback = [
+        [5, 3, 0, 0, 7, 0, 0, 0, 0],
+        [6, 0, 0, 1, 9, 5, 0, 0, 0],
+        [0, 9, 8, 0, 0, 0, 0, 6, 0],
+        [8, 0, 0, 0, 6, 0, 0, 0, 3],
+        [4, 0, 0, 8, 0, 3, 0, 0, 1],
+        [7, 0, 0, 0, 2, 0, 0, 0, 6],
+        [0, 6, 0, 0, 0, 0, 2, 8, 0],
+        [0, 0, 0, 4, 1, 9, 0, 0, 5],
+        [0, 0, 0, 0, 8, 0, 0, 7, 9]
+    ];
+
+    for (let row = 0; row < 9; row++) {
+        for (let col = 0; col < 9; col++) {
+            const value = fallback[row][col];
+            if (value !== 0) {
+                solveCell(row, col, value);
+            }
+        }
+    }
+}
 
 function createGrid() {
     const gridContainer = document.getElementById('sudoku-grid');
 
-    // Create 9x9 grid of cells
     for (let row = 0; row < 9; row++) {
         cellElements[row] = [];
         for (let col = 0; col < 9; col++) {
@@ -75,19 +120,50 @@ function clearGrid() {
     }
 }
 
+function getOptions(x, y) {
+    let found = new Set();
+    // check vert
+    for (let i = 0; i < 9; i++) {
+        let curr = puzzle[x][i];
+        found.add(curr);
+    }
+
+    //check horiz
+    for (let i = 0; i < 9; i++) {
+        let curr = puzzle[i][y];
+        found.add(curr);
+    }
+
+    //check square
+    square_x = Math.floor(x / 3);
+    square_y = Math.floor(y / 3);
+
+    for (let i = square_x * 3; i < square_x * 3 + 3; i++) {
+        for (let j = square_y * 3; j < square_y * 3 + 3; j++) {
+            let curr = puzzle[i][j];
+            found.add(curr);
+        }
+    }
+
+    let opts = nums.filter(x => !found.has(x));
+    return opts;
+}
+
+function nextStep() {
+    for (let x = 0; x < puzzle.length; x++) {
+        for (let y = 0; y < puzzle[x].length; y++) {
+            if (puzzle[x][y] == 0) {
+                opts = getOptions(x, y);
+                puzzle[x][y] = opts;
+                fillCandidates(x, y, opts);
+            }
+        }
+    }
+}
+
 function setupEventListeners() {
-    // Test button to demonstrate functionality
-    document.getElementById('test-btn').addEventListener('click', function() {
-        fillCandidates(0, 0, [1, 2, 3]);
-        fillCandidates(0, 1, [4, 5]);
-        solveCell(0, 2, 9);
-        fillCandidates(1, 0, [6, 7, 8, 9]);
-        solveCell(1, 1, 3);
+    document.getElementById('next-btn').addEventListener('click', function() { nextStep() });
 
-        console.log('Test cells filled!');
-    });
-
-    // Clear button
     document.getElementById('clear-btn').addEventListener('click', function() {
         clearGrid();
         console.log('Grid cleared!');
